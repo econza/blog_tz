@@ -1,32 +1,31 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useEffect } from "react";
+import PostService from "./API/PostService";
 import PostFilter from "./components/PostFilter";
 import PostForm from "./components/PostForm";
 import PostList from "./components/PostList";
 import MyButton from "./components/UI/button/MyButton";
+import Loader from "./components/UI/Loader/loader";
 import MyModal from "./components/UI/MyModal/MyModal";
+import { useFetching } from "./hooks/useFetching";
+import { usePosts } from "./hooks/usePosts";
 import "./styles/App.css";
 
 function App() {
-  const [posts, setPosts] = useState([
-    { id: 1, title: "Javascript", body: "sDescription" },
-    { id: 2, title: "fd Javascript 2", body: "qDescription" },
-    { id: 2, title: "tg Javascript 3", body: "rDescription" },
-  ]);
+  const [posts, setPosts] = useState([]);
   const [filter, setFilter] = useState({ sort: "", query: "" });
   const [modal, setModal] = useState(false);
-
-  const sortedPosts = useMemo(() => {
-    if (filter.sort) {
-      [...posts].sort((a, b) => a[filter.sort].localeCompare(b[filter.sort]));
-    }
-    return posts;
-  }, [filter.sort, posts]);
-
-  const sortedAndSearchedPosts = useMemo(() => {
-    return sortedPosts.filter((post) =>
-      post.title.toLowerCase().includes(filter.query.toLowerCase())
-    );
-  }, [filter.query, sortedPosts]);
+  const [totalCount, setTotalCount] = useState(0);
+  const [limit, setLimit] = useState(10);
+  const [page, setPage] = useState(1);
+  const sortedAndSearchedPosts = usePosts(posts, filter.sort, filter.query);
+  const [fetchPosts, isPostsLoading, postError] = useFetching(async () => {
+    const response = await PostService.getAll(limit, page);
+    setPosts(response.data);
+    setTotalCount(response.headers["x-total-count"]);
+  }, []);
+  useEffect(() => {
+    fetchPosts();
+  }, []);
 
   const createPost = (newPost) => {
     setPosts([...posts, newPost]);
@@ -47,11 +46,20 @@ function App() {
       </MyModal>
       <hr style={{ margin: "15px 0" }}></hr>
       <PostFilter filter={filter} setFilter={setFilter} />
-      <PostList
-        remove={removePost}
-        posts={sortedAndSearchedPosts}
-        title={"Список постов 1"}
-      />
+      {postError && <h1>Произошла ошибка ${postError}</h1>}
+      {isPostsLoading ? (
+        <div
+          style={{ display: "flex", justifyContent: "center", marginTop: 50 }}
+        >
+          <Loader />
+        </div>
+      ) : (
+        <PostList
+          remove={removePost}
+          posts={sortedAndSearchedPosts}
+          title={"Список постов 1"}
+        />
+      )}
     </div>
   );
 }
